@@ -8,7 +8,7 @@ import {
   updateProjectName,
   snapshotProject,
 } from "@/lib/projects";
-import { startClaude, isSessionActive, subscribe, StreamEvent } from "@/lib/claude-stream";
+import { startClaude, isSessionActive, killProcess, subscribe, StreamEvent } from "@/lib/claude-stream";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +64,16 @@ export async function GET(
   // Default: return chat history
   const messages = getChatHistory(id);
   return NextResponse.json(messages);
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  log("DELETE", `id=${id}`);
+  killProcess(id);
+  return NextResponse.json({ ok: true });
 }
 
 export async function POST(

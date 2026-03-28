@@ -17,18 +17,21 @@ interface UseChatOptions {
   projectId: string;
   onTitle?: (title: string) => void;
   onFileChange?: (fileName: string) => void;
+  onAssistantDone?: (text: string) => void;
 }
 
 function log(prefix: string, ...args: unknown[]) {
   console.log(`[useChat:${prefix}]`, ...args);
 }
 
-export function useChat({ projectId, onTitle, onFileChange }: UseChatOptions) {
+export function useChat({ projectId, onTitle, onFileChange, onAssistantDone }: UseChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activity, setActivity] = useState<string>("");
   const abortRef = useRef<AbortController | null>(null);
   const projectIdRef = useRef(projectId);
+  const onAssistantDoneRef = useRef(onAssistantDone);
+  onAssistantDoneRef.current = onAssistantDone;
 
   // Reset state when projectId changes to prevent showing stale data
   useEffect(() => {
@@ -130,6 +133,7 @@ export function useChat({ projectId, onTitle, onFileChange }: UseChatOptions) {
                   break;
                 case "done":
                   log("done", `total text length: ${assistantText.length}`);
+                  onAssistantDoneRef.current?.(assistantText);
                   break;
               }
             } catch (e) {
@@ -262,7 +266,8 @@ export function useChat({ projectId, onTitle, onFileChange }: UseChatOptions) {
   const stop = useCallback(() => {
     log("stop", "aborting");
     abortRef.current?.abort();
-  }, []);
+    fetch(`/api/projects/${projectId}/chat`, { method: "DELETE" }).catch(() => {});
+  }, [projectId]);
 
   return { messages, setMessages, isLoading, activity, sendMessage, stop, loadHistory };
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useQueryState } from "nuqs";
 import { Sidebar, ProjectItem } from "@/components/sidebar";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { PreviewPanel } from "@/components/preview/preview-panel";
 import { useChat } from "@/hooks/use-chat";
+import { useSpeech } from "@/hooks/use-speech";
 
 export default function Home() {
   return (
@@ -23,6 +24,8 @@ function HomeContent() {
   const [previewFile, setPreviewFile] = useState<string>("index.html");
   const [hasVersions, setHasVersions] = useState(false);
   const [hasPreviewFile, setHasPreviewFile] = useState(false);
+  const [isDraft, setIsDraft] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
   const handleTitle = useCallback(
     async (title: string) => {
@@ -49,11 +52,41 @@ function HomeContent() {
     setHasVersions(true);
   }, []);
 
+  const handleDraftSend = async (content: string) => {
+    const res = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "New Project" }),
+    });
+    const project = await res.json();
+    setProjects((prev) => [project, ...prev]);
+    setIsDraft(false);
+    setPendingMessage(content);
+    setActiveProjectId(project.id);
+  };
+
+  // speakRef breaks the circular dependency between useSpeech and useChat:
+  // useChat needs speak for onAssistantDone, useSpeech needs chat.sendMessage for onTranscript.
+  const speakRef = useRef<((text: string) => void) | undefined>(undefined);
+
   const chat = useChat({
     projectId: activeProjectId || "",
     onTitle: handleTitle,
     onFileChange: handleFileChange,
+    onAssistantDone: (text: string) => speakRef.current?.(text),
   });
+
+  const handleSend = useCallback(
+    (text: string) => {
+      if (isDraft) handleDraftSend(text);
+      else chat.sendMessage(text);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isDraft, chat.sendMessage]
+  );
+
+  const speech = useSpeech(handleSend);
+  speakRef.current = speech.speak; // keep ref current every render
 
   // Load projects on mount
   useEffect(() => {
@@ -95,9 +128,6 @@ function HomeContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId]);
 
-  const [isDraft, setIsDraft] = useState(false);
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
-
   const handleNewProject = () => {
     setActiveProjectId(null);
     chat.setMessages([]);
@@ -105,19 +135,6 @@ function HomeContent() {
     setHasPreviewFile(false);
     setPreviewFile("index.html");
     setIsDraft(true);
-  };
-
-  const handleDraftSend = async (content: string) => {
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "New Project" }),
-    });
-    const project = await res.json();
-    setProjects((prev) => [project, ...prev]);
-    setIsDraft(false);
-    setPendingMessage(content);
-    setActiveProjectId(project.id);
   };
 
   // Send pending message once projectId is set and chat hook is ready
@@ -189,6 +206,15 @@ function HomeContent() {
                 onStop={chat.stop}
                 onUndo={handleUndo}
                 onShowPreview={() => setShowPreview(true)}
+                isListening={speech.isListening}
+                isPlaying={speech.isPlaying}
+                onStartListening={speech.startListening}
+                onStopListening={speech.stopListening}
+                onStopSpeaking={speech.stopSpeaking}
+                ttsEnabled={speech.ttsEnabled}
+                onToggleTts={speech.toggleTts}
+                ttsRate={speech.rate}
+                onSetTtsRate={speech.setRate}
               />
             </div>
             {showPreview && activeProjectId && (
