@@ -39,10 +39,18 @@ The app runs at `http://localhost:3000`.
 ## Usage
 
 1. Click **Start a New Project**
-2. Type what you want to build (e.g. "make me a tic tac toe game")
+2. Type what you want to build (e.g. "make me a tic tac toe game") — or hold **Space** to talk
 3. Watch Claude think and build in real-time
 4. The preview pane opens automatically when Claude creates an HTML file
 5. Ask for changes ("make the colors purple") and the preview updates
+6. Claude reads its responses aloud — adjust speed with the **Reading Speed** slider
+
+### Voice controls
+
+- **Hold Space** (or hold the mic button) to record — release to send
+- **Escape** stops playback mid-sentence
+- The send button turns into a red stop icon while Claude is processing — click it to cancel
+- Reading speed (0.5×–2.0×) is saved in `localStorage` per browser
 
 ## Tech stack
 
@@ -68,6 +76,7 @@ src/
     sidebar.tsx            # Project list sidebar
   hooks/
     use-chat.ts            # SSE streaming hook
+    use-speech.ts          # SpeechRecognition (hold-to-talk) + SpeechSynthesis (TTS)
   lib/
     claude-stream.ts       # Spawns claude CLI, parses stream-json output
     constants.ts           # System prompt
